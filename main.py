@@ -24,7 +24,7 @@ def fetch_price_data(token, start_time, end_time, interval="1m"):
 def fetch_token_data(db, token):
     """
     Fetches time-series data for a given token.
-    - Long: 300 data points (299 from DB, 1 from API), continuous intervals.
+    - Long: 300 data points (299 from DB, 1 from API), 5 min interval.
     - Short: 300 data points (299 from DB, 1 from API).
     """
     collection = db[f"{token}_timeseries"]
@@ -44,46 +44,29 @@ def fetch_token_data(db, token):
         "unique_id": entry["token"],
         "y": entry["close"]
     } for entry in short_db_data]
-    # Append latest short item from API
+
     if short_api_data:
         formatted_short.append({
             "ds": datetime.fromtimestamp(short_api_data[0][0] / 1000, timezone.utc) + timedelta(minutes=1),
             "unique_id": token,
             "y": float(short_api_data[0][4])  # Close price
         })
-    # Fetch latest long item using API (average of last 5 minute items)
-    long_api_prices = []
-    for i in range(5):
-        minute_time = previous_minute - timedelta(minutes=i)
-        start_time = int(minute_time.timestamp() * 1000)
-        end_time = start_time + 60 * 1000 - 1
-        price_data = fetch_price_data(token, start_time, end_time)
-        if price_data:
-            long_api_prices.append(float(price_data[0][4]))  # Close price
-    if long_api_prices:
-        long_api_avg_price = sum(long_api_prices) / len(long_api_prices)
-        long_api_data = {
-            "ds": previous_minute + timedelta(minutes=1),
-            "unique_id": token,
-            "y": long_api_avg_price
-        }
-    else:
-        long_api_data = None
-    # Fetch 299 most recent 1-minute interval data from DB and calculate long items
-    long_db_data = list(collection.find().sort("timestamp", -1).limit(299 + 4))[::-1]
-    formatted_long = []
-    for i in range(len(long_db_data) - 4):
-        five_min_chunk = long_db_data[i:i+5]
-        avg_price = sum(entry["close"] for entry in five_min_chunk) / 5
+        
+    long_all_data = list(collection.find().sort("timestamp", -1).limit(1500))[::-1]
+    long_db_data = long_all_data[3::5][:299]
+    formatted_long = [{
+        "ds": entry["timestamp"] + timedelta(minutes=1),
+        "unique_id": entry["token"],
+        "y": entry["close"]
+    } for entry in long_db_data]
+    # Append latest short item from API
+    if short_api_data:
         formatted_long.append({
-            "ds": five_min_chunk[-1]["timestamp"] + timedelta(minutes=1),
+            "ds": datetime.fromtimestamp(short_api_data[0][0] / 1000, timezone.utc) + timedelta(minutes=1),
             "unique_id": token,
-            "y": avg_price
+            "y": float(short_api_data[0][4])  # Close price
         })
-    # Append latest long item from API
-    if long_api_data:
-        formatted_long.append(long_api_data)
-    
+
     return {"long": formatted_long, "short": formatted_short}
 
 if __name__ == "__main__":
