@@ -2,6 +2,8 @@
 
 This Python project retrieves real-time and historical cryptocurrency price data from the Binance API and stores it in a MongoDB database. It processes time-series data to generate **short-term (1-minute interval)** and **long-term (5-minute interval)** price trends. The script runs continuously, fetching and formatting price data for further analysis or integration with trading strategies.  
 
+![AI Trading Bot](https://images.pexels.com/photos/6770770/pexels-photo-6770770.jpeg)
+
 ## **Features**  
 
 - **Fetch real-time price data** from Binance API.  
